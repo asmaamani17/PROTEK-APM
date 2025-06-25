@@ -81,6 +81,47 @@
     </div>
   </div>
 
+  <div class="card mt-4">
+    <div class="card-header bg-primary text-white">Senarai Status Penyelamat</div>
+    <div class="card-body p-0">
+      <table class="table table-bordered mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>ID</th>
+            <th>Nama</th>
+            <th>No. Telefon</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse($rescuers as $rescuer)
+          <tr>
+            <td>{{ $rescuer->id }}</td>
+            <td>{{ $rescuer->name }}</td>
+            <td>{{ $rescuer->phone_number ?? '-' }}</td>
+            <td>
+              @php
+                $status = $rescuer->status ?? 'available';
+                $statusMap = [
+                  'available' => ['Sedia', 'success'],
+                  'assigned' => ['Bertugas', 'warning'],
+                ];
+                $statusText = $statusMap[$status][0] ?? ucfirst($status);
+                $statusClass = 'bg-' . ($statusMap[$status][1] ?? 'secondary');
+              @endphp
+              <span class="badge {{ $statusClass }}">{{ $statusText }}</span>
+            </td>
+          </tr>
+          @empty
+          <tr>
+            <td colspan="4" class="text-center">Tiada rekod penyelamat dijumpai</td>
+          </tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 @endsection
 
 @push('scripts')
