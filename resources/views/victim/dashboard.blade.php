@@ -20,10 +20,19 @@
       <div id="map-mangsa" style="height: 350px; width: 100%; border-radius: 0.5rem;"></div>
     </div>
   </div>
+
+
+
+  <!-- Chatbot Button (Floating) -->
+  <button id="btn-chatbot" class="btn btn-floating d-flex align-items-center justify-content-center shadow" 
+    style="background-color: #f76b15; color: white; position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; z-index: 1000; padding: 0;">
+    <i class="fas fa-comments fa-lg"></i>
+  </button>
+
   <!-- Emergency Contact Button (Floating) -->
   <button class="btn btn-danger btn-floating d-flex align-items-center justify-content-center shadow" 
     data-bs-toggle="modal" data-bs-target="#contactModal" 
-    style="position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; z-index: 1000; padding: 0;">
+    style="position: fixed; bottom: 90px; right: 20px; width: 60px; height: 60px; border-radius: 50%; z-index: 1000; padding: 0;">
     <i class="fas fa-phone-alt fa-lg"></i>
     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-white text-danger border border-danger" style="font-size: 0.6rem; padding: 0.25em 0.4em;">
       <i class="fas fa-exclamation"></i>
@@ -92,6 +101,44 @@
     </div>
   </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.botpress.cloud/webchat/v3.0/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/06/22/18/20250622185105-PX8MXXTO.js"></script>
+<script>
+  // Initialize chatbot
+  window.botpress.init({
+    "botId": "690f8920-8ec6-4626-aa50-bb256d1b9da2",
+    "hideWidget": true, // Hide the default launcher
+    "configuration": {
+      "version": "v1",
+      "botName": "AkakPROTEK",
+      "botAvatar": "https://files.bpcontent.cloud/2025/06/23/00/20250623001049-OJ0WLQ8J.jpeg",
+      "color": "#f76b15",
+      "variant": "solid",
+      "headerVariant": "solid",
+      "themeMode": "light",
+      "fontFamily": "inter",
+      "radius": 4,
+      "feedbackEnabled": false,
+      "footer": "[⚡ by Botpress](https://botpress.com/?from=webchat)"
+    },
+    "clientId": "7067c78f-b738-4cbd-b2d7-ceca8fce2d43"
+  });
+
+  // Add event listener to custom button to open chatbot
+  document.addEventListener('DOMContentLoaded', function() {
+    const chatbotButton = document.getElementById('btn-chatbot');
+    if (chatbotButton) {
+      chatbotButton.addEventListener('click', function() {
+        window.botpress.open();
+      });
+    }
+  });
+</script>
+@endpush
+
+
 
 @push('styles')
 <style>

@@ -103,7 +103,24 @@ class AdminController extends Controller
         $victimsWithCoordinates = $victims;
 
         // Pass both variables to maintain backward compatibility
-        return view('admin.dashboard', compact('cases', 'victims', 'victimsWithCoordinates', 'activeTab'));
+        // Get rescuers for the admin's area
+        $rescuers = User::where('role', 'rescuer')
+            ->where('daerah', $adminArea)
+            ->get();
+
+        // Get IDs of rescuers assigned to active cases in the admin's area
+        $assignedRescuerIds = $cases->where('status', '!=', 'completed')
+                                     ->whereNotNull('rescuer_id')
+                                     ->pluck('rescuer_id')
+                                     ->unique();
+
+        // Determine rescuer status
+        $rescuers->each(function ($rescuer) use ($assignedRescuerIds) {
+            $rescuer->status = $assignedRescuerIds->contains($rescuer->id) ? 'assigned' : 'available';
+        });
+
+        // Pass both variables to maintain backward compatibility
+        return view('admin.dashboard', compact('cases', 'victims', 'victimsWithCoordinates', 'activeTab', 'rescuers'));
     }
 
 }
