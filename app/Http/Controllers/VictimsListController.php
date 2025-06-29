@@ -48,6 +48,12 @@ class VictimsListController extends Controller
                 'vulnerable_groups.id', // keep id for internal use if needed
             ]);
 
+        // Filter by admin's daerah
+        $query->where(function($q) use ($adminArea) {
+            $q->where('vulnerable_groups.district', $adminArea)
+              ->orWhere('users.daerah', $adminArea);
+        });
+
         // Search
         $search = $request->get('search');
         if ($search) {
@@ -55,15 +61,23 @@ class VictimsListController extends Controller
             $query->where(function($q) use ($searchTerms) {
                 foreach ($searchTerms as $term) {
                     $q->where(function($innerQ) use ($term) {
-                        $innerQ->where('users.name', 'like', "%{$term}%")
+                        $innerQ->where('vulnerable_groups.id', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.serial_number', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.name', 'like', "%{$term}%")
                               ->orWhere('vulnerable_groups.identification_number', 'like', "%{$term}%")
                               ->orWhere('vulnerable_groups.phone_number', 'like', "%{$term}%")
-                              ->orWhere('users.email', 'like', "%{$term}%")
-                              ->orWhere('vulnerable_groups.disability_category', 'like', "%{$term}%")
                               ->orWhere('vulnerable_groups.gender', 'like', "%{$term}%")
-                              ->orWhere('vulnerable_groups.age_group', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.address', 'like', "%{$term}%")
                               ->orWhere('vulnerable_groups.district', 'like', "%{$term}%")
-                              ->orWhere('vulnerable_groups.address', 'like', "%{$term}%");
+                              ->orWhere('vulnerable_groups.parliament', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.dun', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.disability_category', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.client_type', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.oku_status', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.age_group', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.parliament_dun_code', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.prb_serial_number', 'like', "%{$term}%")
+                              ->orWhere('vulnerable_groups.installation_status', 'like', "%{$term}%");
                     });
                 }
             });
