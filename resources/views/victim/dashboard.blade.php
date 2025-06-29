@@ -10,10 +10,9 @@
       <button id="btn-sos" type="submit" class="btn btn-danger btn-lg px-5 py-3 fw-bold shadow" style="font-size: 2rem; border-radius: 1.5rem;">SOS</button>
     </form>
     <!-- Nama Mangsa -->
-    <div class="mt-2 fs-5"><strong>Nama Mangsa:</strong> {{ $user->name ?? 'Nama Mangsa' }}</div>
-    
-    <!-- Status Bantuan -->
-    @php
+    <div class="mt-2 fs-5"><strong>Nama Mangsa:</strong> {{ $user->name ?? 'Nor Aisyah Binti Razak' }}</div>
+     <!-- Status Bantuan -->
+     @php
         $status = $user->status ?? 'mohon_bantuan'; // Default status if not set
         $statusText = [
             'mohon_bantuan' => 'Mohon Bantuan',
@@ -86,7 +85,7 @@
             <a href="tel:994" class="list-group-item list-group-item-action">
               <div class="d-flex w-100 justify-content-between">
                 <h6 class="mb-1"><i class="fas fa-fire-extinguisher text-danger me-2"></i>Bomba & Penyelamat</h6>
-                <span class="badge bg-danger rounded-pill"><i class="fas fa-phone-alt me-1"></i> 999</span>
+                <span class="badge bg-danger rounded-pill"><i class="fas fa-phone-alt me-1"></i> 994</span>
               </div>
               <small class="text-muted">Untuk kebakaran dan penyelamatan</small>
             </a>

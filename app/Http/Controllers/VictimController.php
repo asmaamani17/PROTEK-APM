@@ -49,10 +49,14 @@ class VictimController extends Controller
             $message = 'No victim record found for your account.';
         }
 
+        // Get active case if exists
+        $activeCase = $user->activeRescueCase;
+        
         return view('victim.dashboard', [
             'coordinates' => $coordinates,
-            'user' => $user,
+            'user' => $user->load('rescueCases.rescuer'),
             'victims' => $victimData,
+            'activeCase' => $activeCase,
             'message' => empty($victimData) ? 'No victim record found for your account.' : null,
         ]);
     }
@@ -64,12 +68,23 @@ class VictimController extends Controller
             'lng' => 'required|numeric',
         ]);
 
+        // Check if there's already an active case for this victim
+        $existingCase = RescueCase::where('victim_id', auth()->id())
+            ->where('status', '!=', 'completed')
+            ->first();
+
+        if ($existingCase) {
+            return back()->with('error', 'You already have an active SOS request.');
+        }
+
+        // Create new rescue case with 'mohon_bantuan' status
         RescueCase::create([
             'victim_id' => auth()->id(),
             'lat' => $validated['lat'],
             'lng' => $validated['lng'],
+            'status' => 'mohon_bantuan',
         ]);
 
-        return back()->with('success', 'SOS Sent Successfully!');
+        return back()->with('success', 'SOS Sent Successfully! Help is on the way!');
     }
 }

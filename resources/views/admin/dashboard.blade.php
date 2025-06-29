@@ -5,26 +5,22 @@
     <h2>DASHBOARD BILIK GERAKAN</h2>
 </div>
 
-  <div class="row g-3">
-    @php
-        $totalCases = $cases->count();
-        $activeCases = $cases->where('status', '!=', 'completed')->count();
-        $completedCases = $cases->where('status', 'completed')->count();
-        $totalVictims = count($victimsWithCoordinates ?? []);
-    @endphp
-    
+  <div class="row g-3 mb-4">
     @foreach([
-      ['label' => 'Belum Ambil Tindakan', 'bg' => 'primary', 'count' => $stats['pending'] ?? 0],
-      ['label' => 'Sedang Diselamatkan', 'bg' => 'warning', 'count' => $stats['in_progress'] ?? 0],
-      ['label' => 'Telah Diselamatkan', 'bg' => 'success', 'count' => $stats['rescued'] ?? 0],
-      ['label' => 'Tidak Ditemui', 'bg' => 'danger', 'count' => $stats['not_found'] ?? 0],
-      ['label' => 'Kes Selesai', 'bg' => 'dark', 'count' => $stats['completed'] ?? 0],
-      ['label' => 'Jumlah Kes', 'bg' => 'secondary', 'count' => $stats['total'] ?? 0],
+      ['label' => 'Mohon Bantuan', 'bg' => 'danger', 'count' => $stats['pending'] ?? 0, 'icon' => 'exclamation-triangle'],
+      ['label' => 'Sedang Diselamatkan', 'bg' => 'warning', 'count' => $stats['in_progress'] ?? 0, 'icon' => 'people-carry'],
+      ['label' => 'Telah Diselamatkan', 'bg' => 'success', 'count' => $stats['rescued'] ?? 0, 'icon' => 'user-shield'],
+      ['label' => 'Tidak Ditemui', 'bg' => 'secondary', 'count' => $stats['not_found'] ?? 0, 'icon' => 'user-slash'],
+      ['label' => 'Kes Selesai', 'bg' => 'dark', 'count' => $stats['completed'] ?? 0, 'icon' => 'check-circle'],
+      ['label' => 'Jumlah Kes', 'bg' => 'primary', 'count' => $stats['total'] ?? 0, 'icon' => 'list-ol'],
     ] as $stat)
-    <div class="col-12 col-md-4 col-lg-2">
-      <div class="p-3 text-white rounded text-center" style="background-color: var(--bs-{{ $stat['bg'] }});">
-        <div>{{ $stat['label'] }}</div>
-        <div class="fs-4 fw-bold">{{ $stat['count'] }}</div>
+    <div class="col-6 col-md-4 col-lg-2">
+      <div class="p-3 text-white rounded text-center h-100 d-flex flex-column justify-content-center" style="background-color: var(--bs-{{ $stat['bg'] }});">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <i class="fas fa-{{ $stat['icon'] }} me-2"></i>
+          <div>{{ $stat['label'] }}</div>
+        </div>
+        <div class="display-6 fw-bold">{{ $stat['count'] }}</div>
       </div>
     </div>
     @endforeach
@@ -47,6 +43,7 @@
             <th>Nama</th>
             <th>Kategori</th>
             <th>Status</th>
+            <th>Tindakan</th>
           </tr>
         </thead>
         <tbody>
@@ -57,23 +54,34 @@
             <td>{{ $victim['disability_category'] ?? $victim['category'] ?? '-' }}</td>
             <td>
               @php
-                $status = $victim['status'] ?? 'pending';
+                $status = $victim['status'] ?? null;
                 $statusMap = [
-                  'pending' => ['Belum Ambil Tindakan','primary'],
-                  'in_progress' => ['Sedang Diselamatkan','warning'],
-                  'rescued' => ['Diselamatkan','success'],
-                  'not_found' => ['Tidak Ditemui','danger'],
-                  'completed' => ['Kes Selesai','dark'],
+                  'mohon_bantuan' => ['Mohon Bantuan', 'danger', 'exclamation-triangle'],
+                  'in_progress' => ['Sedang Diselamatkan', 'warning', 'people-carry'],
+                  'rescued' => ['Telah Diselamatkan', 'success', 'user-shield'],
+                  'not_found' => ['Tidak Ditemui', 'secondary', 'user-slash'],
+                  'completed' => ['Kes Selesai', 'dark', 'check-circle']
                 ];
-                $statusText = $statusMap[$status][0] ?? $status;
-                $statusClass = 'bg-' . ($statusMap[$status][1] ?? 'secondary');
+                
+                if (!$status) {
+                    $statusText = 'Tiada Kes Aktif';
+                    $statusClass = 'bg-light text-dark';
+                    $statusIcon = 'times';
+                } else {
+                    $statusText = $statusMap[$status][0] ?? ucfirst(str_replace('_', ' ', $status));
+                    $statusClass = 'bg-' . ($statusMap[$status][1] ?? 'secondary');
+                    $statusIcon = $statusMap[$status][2] ?? 'info-circle';
+                }
               @endphp
-              <span class="badge {{ $statusClass }}">{{ $statusText }}</span>
+              <span class="badge {{ $statusClass }} d-flex align-items-center">
+                <i class="fas fa-{{ $statusIcon }} me-1"></i>
+                <span>{{ $statusText }}</span>
+              </span>
             </td>
           </tr>
           @empty
           <tr>
-            <td colspan="4" class="text-center">Tiada rekod mangsa dijumpai</td>
+            <td colspan="5" class="text-center">Tiada rekod mangsa dijumpai</td>
           </tr>
           @endforelse
         </tbody>

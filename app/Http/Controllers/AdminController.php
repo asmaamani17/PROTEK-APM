@@ -48,23 +48,42 @@ class AdminController extends Controller
             ->whereHas('victim', function($query) use ($adminArea) {
                 $query->where('daerah', $adminArea);
             })
+            ->orderBy('created_at', 'desc')
             ->get();
+
+        // Calculate statistics
+        $stats = [
+            'pending' => $cases->where('status', 'mohon_bantuan')->count(),
+            'in_progress' => $cases->where('status', 'in_progress')->count(),
+            'rescued' => $cases->where('status', 'rescued')->count(),
+            'not_found' => $cases->where('status', 'not_found')->count(),
+            'completed' => $cases->where('status', 'completed')->count(),
+            'total' => $cases->count(),
+        ];
 
         // Get vulnerable groups for admin's area from database
         $vulnerableGroups = \App\Models\VulnerableGroup::where('district', $adminArea)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->get()
-            ->map(function($item) {
+            ->map(function($item) use ($cases) {
+                // Find if this victim has an active case
+                $case = $cases->where('victim_id', $item->user_id)
+                    ->where('status', '!=', 'completed')
+                    ->first();
+
                 // Map database fields to the format expected by the view
                 return [
                     'serial_number' => $item->serial_number,
                     'name' => $item->name,
                     'lat' => (float)$item->latitude,
                     'lng' => (float)$item->longitude,
-                    'gender' => $item->gender, // Include gender for info window
-                    'disability_category' => $item->disability_category, // Include original category for coloring
-                    'category' => $this->mapCategory($item->disability_category, $item->age_group, $item->oku_status)
+                    'gender' => $item->gender,
+                    'disability_category' => $item->disability_category,
+                    'category' => $this->mapCategory($item->disability_category, $item->age_group, $item->oku_status),
+                    'status' => $case ? $case->status : null,
+                    'case_id' => $case ? $case->id : null,
+                    'user_id' => $item->user_id
                 ];
             })
             ->toArray();
@@ -88,9 +107,6 @@ class AdminController extends Controller
             return $victim;
         })->toArray();
 
-        // Get daerah coordinates for pin placement
-        $daerahCoordinates = DaerahCoordinates::getAllCoordinates();
-        
         // Get center coordinates for admin's area
         $areaCenter = [
             'BATU PAHAT' => ['lat' => 1.85, 'lng' => 102.93],
@@ -102,7 +118,6 @@ class AdminController extends Controller
         // Convert victims to array for map markers
         $victimsWithCoordinates = $victims;
 
-        // Pass both variables to maintain backward compatibility
         // Get rescuers for the admin's area
         $rescuers = User::where('role', 'rescuer')
             ->where('daerah', $adminArea)
@@ -119,8 +134,8 @@ class AdminController extends Controller
             $rescuer->status = $assignedRescuerIds->contains($rescuer->id) ? 'assigned' : 'available';
         });
 
-        // Pass both variables to maintain backward compatibility
-        return view('admin.dashboard', compact('cases', 'victims', 'victimsWithCoordinates', 'activeTab', 'rescuers'));
+        // Pass all variables to the view
+        return view('admin.dashboard', compact('cases', 'victims', 'victimsWithCoordinates', 'activeTab', 'rescuers', 'stats'));
     }
 
 }
