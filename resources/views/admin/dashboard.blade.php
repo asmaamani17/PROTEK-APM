@@ -38,7 +38,7 @@
   </div>
 
   <div class="card mt-4">
-    <div class="card-header bg-primary text-white">Senarai Status Mangsa</div>
+    <div class="card-header bg-primary text-white">Senarai Status Golongan Rentan</div>
     <div class="card-body p-0">
       <table class="table table-bordered mb-0">
         <thead class="table-light">

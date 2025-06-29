@@ -25,6 +25,107 @@
   <div class="col-6 col-md-3"><button class="btn btn-warning w-100" onclick="kemaskiniStatus('Tugasan Baru')">🔄 Tugasan Baru</button></div>
 </div>
 
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+function kemaskiniStatus(status) {
+    const cases = @json($cases);
+    let caseToUpdate = null;
+
+    // This logic assumes a rescuer handles one case at a time.
+    // 'Terima Tugasan' applies to a 'new' case.
+    // Other actions apply to an 'assigned' case.
+    if (status === 'Terima Tugasan') {
+        caseToUpdate = cases.find(c => c.status === 'new');
+    } else if (status === 'Telah Diselamatkan' || status === 'Tidak Ditemui') {
+        caseToUpdate = cases.find(c => c.status === 'assigned');
+    }
+
+    if (status === 'Tugasan Baru') {
+        Swal.fire({
+            title: 'Memuatkan Semula',
+            text: 'Mendapatkan senarai tugasan terkini...',
+            icon: 'info',
+            timer: 1500,
+            showConfirmButton: false,
+            willOpen: () => {
+                Swal.showLoading();
+            },
+            willClose: () => {
+                window.location.reload();
+            }
+        });
+        return;
+    }
+    
+    if (!caseToUpdate) {
+        Swal.fire('Tiada Tugasan', 'Tiada tugasan yang sesuai untuk tindakan ini.', 'info');
+        return;
+    }
+
+    let statusText = '';
+    let newStatus = '';
+
+    switch(status) {
+        case 'Terima Tugasan':
+            statusText = 'menerima tugasan';
+            newStatus = 'assigned';
+            break;
+        case 'Telah Diselamatkan':
+            statusText = 'menandakan sebagai "Telah Diselamatkan"';
+            newStatus = 'completed';
+            break;
+        case 'Tidak Ditemui':
+            statusText = 'menandakan sebagai "Tidak Ditemui"';
+            newStatus = 'failed';
+            break;
+        default:
+            Swal.fire('Ralat', 'Tindakan tidak sah.', 'error');
+            return;
+    }
+
+    Swal.fire({
+        title: 'Anda pasti?',
+        text: `Anda akan ${statusText} untuk kes mangsa "${caseToUpdate.victim.name}".`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Ya, teruskan!',
+        cancelButtonText: 'Batal'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Create and submit a form to follow Laravel's conventions
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/rescuer/cases/${caseToUpdate.id}`;
+
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = '{{ csrf_token() }}';
+            form.appendChild(csrfInput);
+
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'PUT';
+            form.appendChild(methodInput);
+
+            const statusInput = document.createElement('input');
+            statusInput.type = 'hidden';
+            statusInput.name = 'status';
+            statusInput.value = newStatus;
+            form.appendChild(statusInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+</script>
+@endpush
+
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
@@ -395,210 +496,314 @@
     }, 1500);
   });
   </script>
-  @endpush
+  <script>
+  function kemaskiniStatus(status) {
+      const cases = @json($cases);
+      handleCaseAction(status, cases);
+  }
 
-@push('scripts')
-<script>
-    let map;
-    let markers = [];
-    let infoWindows = [];
-    let defaultPosition = { lat: {{ $rescuerCoordinates['lat'] ?? 2.6485 }}, lng: {{ $rescuerCoordinates['lng'] ?? 103.8350 }} };
-    let userPosition = null;
+  // This logic assumes a rescuer handles one case at a time.
+  // 'Terima Tugasan' applies to a 'new' case.
+  // Other actions apply to an 'assigned' case.
+  function handleCaseAction(status, cases) {
+      let caseToUpdate;
+      
+      if (status === 'Terima Tugasan') {
+          caseToUpdate = cases.find(c => c.status === 'new');
+      } else if (status === 'Telah Diselamatkan' || status === 'Tidak Ditemui') {
+          caseToUpdate = cases.find(c => c.status === 'assigned');
+      }
 
-    // Initialize the map
-    function initMap() {
-        // Create the map centered on the rescuer's location
-        map = new google.maps.Map(document.getElementById('main-map'), {
-            zoom: 12,
-            center: defaultPosition,
-            mapTypeControl: true,
-            streetViewControl: false,
-            fullscreenControl: true,
-            styles: [
-                {
-                    featureType: 'poi',
-                    elementType: 'labels',
-                    stylers: [{ visibility: 'off' }]
-                }
-            ]
-        });
+      if (status === 'Tugasan Baru') {
+          Swal.fire({
+              title: 'Memuatkan Semula',
+              text: 'Mendapatkan senarai tugasan terkini...',
+              icon: 'info',
+              timer: 1500,
+              showConfirmButton: false,
+              willOpen: () => {
+                  Swal.showLoading();
+              },
+              willClose: () => {
+                  window.location.reload();
+              }
+          });
+          return;
+      }
+      
+      if (!caseToUpdate) {
+          Swal.fire('Tiada Tugasan', 'Tiada tugasan yang sesuai untuk tindakan ini.', 'info');
+          return;
+      }
 
-        // Add markers for each SOS case
-        @if(isset($cases) && count($cases) > 0)
-            @foreach($cases as $case)
-                addCaseMarker(
-                    {{ $case->id }},
-                    {{ $case->victim->lat }},
-                    {{ $case->victim->lng }},
-                    '{{ $case->victim->name }}',
-                    '{{ $case->victim->category }}',
-                    '{{ $case->victim->phone_number ?? 'Tiada' }}',
-                    '{{ $case->status }}',
-                    '{{ $case->formatted_created_at ?? date('d/m/Y H:i', strtotime($case->created_at)) }}'
-                );
-            @endforeach
-            // Fit map to show all markers
-            fitMapToMarkers();
-        @else
-            // If no cases, just center on default position
-            map.setCenter(defaultPosition);
-            map.setZoom(12);
-        @endif
+      let statusText = '';
+      let newStatus = '';
 
-        // Try to get the rescuer's current location
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    userPosition = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    addRescuerMarker(userPosition.lat, userPosition.lng);
-                },
-                (error) => {
-                    console.error('Error getting location:', error);
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      switch(status) {
+          case 'Terima Tugasan':
+              statusText = 'menerima tugasan';
+              newStatus = 'assigned';
+              break;
+          case 'Telah Diselamatkan':
+              statusText = 'menandakan sebagai "Telah Diselamatkan"';
+              newStatus = 'completed';
+              break;
+          case 'Tidak Ditemui':
+              statusText = 'menandakan sebagai "Tidak Ditemui"';
+              newStatus = 'failed';
+              break;
+          default:
+              Swal.fire('Ralat', 'Tindakan tidak sah.', 'error');
+              return;
+      }
+
+      Swal.fire({
+          title: 'Anda pasti?',
+          text: `Anda akan ${statusText} untuk kes mangsa "${caseToUpdate.victim.name}".`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Ya, teruskan!',
+          cancelButtonText: 'Batal'
+      }).then((result) => {
+          if (result.isConfirmed) {
+              // Create and submit a form to follow Laravel's conventions
+              const form = document.createElement('form');
+              form.method = 'POST';
+              form.action = `/rescuer/cases/${caseToUpdate.id}`; 
+
+              const csrfInput = document.createElement('input');
+              csrfInput.type = 'hidden';
+              csrfInput.name = '_token';
+              csrfInput.value = '{{ csrf_token() }}';
+              form.appendChild(csrfInput);
+
+              const methodInput = document.createElement('input');
+              methodInput.type = 'hidden';
+              methodInput.name = '_method';
+              methodInput.value = 'PUT';
+              form.appendChild(methodInput);
+
+              const statusInput = document.createElement('input');
+              statusInput.type = 'hidden';
+              statusInput.name = 'status';
+              statusInput.value = newStatus;
+              form.appendChild(statusInput);
+
+              document.body.appendChild(form);
+              form.submit();
+          }
+      });
+  }
+
+let map, markers = [], infoWindows = [];
+let defaultPosition = { lat: {{ $rescuerCoordinates['lat'] ?? 2.6485 }}, lng: {{ $rescuerCoordinates['lng'] ?? 103.8350 }} };
+let userPosition = null;
+
+// Initialize the map
+function initMap() {
+    // Create the map centered on the rescuer's location
+    map = new google.maps.Map(document.getElementById('main-map'), {
+        zoom: 12,
+        center: defaultPosition,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        styles: [
+            {
+                featureType: 'poi',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }]
+            }
+        ]
+    });
+
+    // Add markers for each SOS case
+    @if(isset($cases) && count($cases) > 0)
+        @foreach($cases as $case)
+            addCaseMarker(
+                {{ $case->id }},
+                {{ $case->victim->lat }},
+                {{ $case->victim->lng }},
+                '{{ $case->victim->name }}',
+                '{{ $case->victim->category }}',
+                '{{ $case->victim->phone_number ?? 'Tiada' }}',
+                '{{ $case->status }}',
+                '{{ $case->formatted_created_at ?? date('d/m/Y H:i', strtotime($case->created_at)) }}'
             );
-        }
-    }
-    
+        @endforeach
+        // Fit map to show all markers
+        fitMapToMarkers();
+    @else
+        // If no cases, just center on default position
+        map.setCenter(defaultPosition);
+        map.setZoom(12);
+    @endif
 
-    // Add a marker for a case
-    function addCaseMarker(id, lat, lng, name, category, phone, status, reportedAt) {
-        const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
-        const iconUrl = 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
-        const marker = new google.maps.Marker({
-            position: position,
-            map: map,
-            title: name,
-            icon: {
-                url: iconUrl,
-                scaledSize: new google.maps.Size(32, 32)
-            }
-        });
-        const contentString = `
-            <div style="min-width: 200px;">
-                <h6 class="mb-2" style="color: #0d6efd; font-weight: 600;">${name}</h6>
-                <div class="mb-1"><small class="text-muted">Kategori:</small> ${category}</div>
-                <div class="mb-1"><small class="text-muted">No. Telefon:</small> ${phone}</div>
-                <div class="mb-2"><small class="text-muted">Masa Lapor:</small> ${reportedAt}</div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="badge ${getStatusBadgeClass(status)}">${getStatusText(status)}</span>
-                    <button onclick="centerMapOnCase(${lat}, ${lng})" class="btn btn-sm btn-outline-primary btn-sm">
-                        <i class="fas fa-location-arrow"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-        const infoWindow = new google.maps.InfoWindow({
-            content: contentString
-        });
-        marker.addListener('click', () => {
-            infoWindows.forEach(iw => iw.close());
-            infoWindow.open(map, marker);
-        });
-        markers.push(marker);
-        infoWindows.push(infoWindow);
-        return marker;
-    }
-    function addRescuerMarker(lat, lng) {
-        const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
-        const marker = new google.maps.Marker({
-            position: position,
-            map: map,
-            title: 'Lokasi Anda',
-            icon: {
-                url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-                scaledSize: new google.maps.Size(32, 32)
+    // Try to get the rescuer's current location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                userPosition = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                addRescuerMarker(userPosition.lat, userPosition.lng);
             },
-            zIndex: 1000
-        });
-        const infoWindow = new google.maps.InfoWindow({
-            content: '<div><strong>Lokasi Anda</strong><br>Anda berada di sini</div>'
-        });
+            (error) => {
+                console.error('Error getting location:', error);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }
+}
+
+// Add a marker for a case
+function addCaseMarker(id, lat, lng, name, category, phone, status, reportedAt) {
+    const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
+    const iconUrl = 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+    const marker = new google.maps.Marker({
+        position: position,
+        map: map,
+        title: name,
+        icon: {
+            url: iconUrl,
+            scaledSize: new google.maps.Size(32, 32)
+        }
+    });
+    const contentString = `
+        <div style="min-width: 200px;">
+            <h6 class="mb-2" style="color: #0d6efd; font-weight: 600;">${name}</h6>
+            <div class="mb-1"><small class="text-muted">Kategori:</small> ${category}</div>
+            <div class="mb-1"><small class="text-muted">No. Telefon:</small> ${phone}</div>
+            <div class="mb-2"><small class="text-muted">Masa Lapor:</small> ${reportedAt}</div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="badge ${getStatusBadgeClass(status)}">${getStatusText(status)}</span>
+                <button onclick="centerMapOnCase(${lat}, ${lng})" class="btn btn-sm btn-outline-primary btn-sm">
+                    <i class="fas fa-location-arrow"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    const infoWindow = new google.maps.InfoWindow({
+        content: contentString
+    });
+    marker.addListener('click', () => {
+        infoWindows.forEach(iw => iw.close());
         infoWindow.open(map, marker);
-        markers.push(marker);
-        infoWindows.push(infoWindow);
-    }
-    function fitMapToMarkers() {
-        const bounds = new google.maps.LatLngBounds();
-        let hasMarkers = false;
-        markers.forEach(marker => {
-            bounds.extend(marker.getPosition());
-            hasMarkers = true;
-        });
-        if (hasMarkers) {
-            map.fitBounds(bounds);
-            const zoom = map.getZoom();
-            if (zoom > 14) {
-                map.setZoom(14);
-            }
-        } else {
-            map.setCenter(defaultPosition);
-            map.setZoom(12);
+    });
+    markers.push(marker);
+    infoWindows.push(infoWindow);
+    return marker;
+}
+
+function addRescuerMarker(lat, lng) {
+    const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
+    const marker = new google.maps.Marker({
+        position: position,
+        map: map,
+        title: 'Lokasi Anda',
+        icon: {
+            url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+            scaledSize: new google.maps.Size(32, 32)
+        },
+        zIndex: 1000
+    });
+    const infoWindow = new google.maps.InfoWindow({
+        content: '<div><strong>Lokasi Anda</strong><br>Anda berada di sini</div>'
+    });
+    infoWindow.open(map, marker);
+    markers.push(marker);
+    infoWindows.push(infoWindow);
+}
+
+function fitMapToMarkers() {
+    const bounds = new google.maps.LatLngBounds();
+    let hasMarkers = false;
+    markers.forEach(marker => {
+        bounds.extend(marker.getPosition());
+        hasMarkers = true;
+    });
+    if (hasMarkers) {
+        map.fitBounds(bounds);
+        const zoom = map.getZoom();
+        if (zoom > 14) {
+            map.setZoom(14);
         }
+    } else {
+        map.setCenter(defaultPosition);
+        map.setZoom(12);
     }
-    function centerMapOnCase(lat, lng) {
-        const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
-        map.setCenter(position);
-        map.setZoom(16);
+}
+
+function centerMapOnCase(lat, lng) {
+    const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
+    map.setCenter(position);
+    map.setZoom(16);
+}
+
+function refreshMap() {
+    window.location.reload();
+}
+
+function showCaseDetails(caseId) {
+    alert('Butiran lanjut untuk kes #' + caseId);
+}
+
+function getStatusText(status) {
+    switch(status) {
+        case 'new': return 'Menunggu';
+        case 'assigned': return 'Dalam Perjalanan';
+        case 'completed': return 'Diselamatkan';
+        default: return 'Tidak Ditemui';
     }
-    function refreshMap() {
-        window.location.reload()
+}
+
+function getStatusBadgeClass(status) {
+    switch(status) {
+        case 'new': return 'bg-warning';
+        case 'assigned': return 'bg-info';
+        case 'completed': return 'bg-success';
+        default: return 'bg-danger';
     }
-    function showCaseDetails(caseId) {
-        alert('Butiran lanjut untuk kes #' + caseId);
-    }
-    function getStatusText(status) {
-        switch(status) {
-            case 'new': return 'Menunggu';
-            case 'assigned': return 'Dalam Perjalanan';
-            case 'completed': return 'Diselamatkan';
-            default: return 'Tidak Ditemui';
-        }
-    }
-    function getStatusBadgeClass(status) {
-        switch(status) {
-            case 'new': return 'bg-warning';
-            case 'assigned': return 'bg-info';
-            case 'completed': return 'bg-success';
-            default: return 'bg-danger';
-        }
-    }
-    window.gm_authFailure = function() {
-        console.error('Google Maps authentication failed');
+}
+
+window.gm_authFailure = function() {
+    console.error('Google Maps authentication failed');
+    const errorDiv = document.getElementById('map-error');
+    errorDiv.style.display = 'block';
+    errorDiv.innerHTML = `
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Ralat!</strong> Gagal memuatkan peta. Sila pastikan kunci API Google Maps anda sah dan diaktifkan.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    const mapLoading = document.getElementById('map-loading');
+    if (mapLoading) mapLoading.style.display = 'none';
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
         const errorDiv = document.getElementById('map-error');
         errorDiv.style.display = 'block';
         errorDiv.innerHTML = `
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <strong>Ralat!</strong> Gagal memuatkan peta. Sila pastikan kunci API Google Maps anda sah dan diaktifkan.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <div class="alert alert-danger">
+                <strong>Ralat!</strong> Google Maps API gagal dimuatkan. Sila semak sambungan internet anda.
             </div>
         `;
-        const mapLoading = document.getElementById('map-loading');
-        if (mapLoading) mapLoading.style.display = 'none';
-    };
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
-            const errorDiv = document.getElementById('map-error');
-            errorDiv.style.display = 'block';
-            errorDiv.innerHTML = `
-                <div class="alert alert-danger">
-                    <strong>Ralat!</strong> Google Maps API gagal dimuatkan. Sila semak sambungan internet anda.
-                </div>
-            `;
-            return;
-        }
-    });
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible' && typeof map !== 'undefined') {
-            setTimeout(() => {
-                google.maps.event.trigger(map, 'resize');
-                map.setCenter(map.getCenter());
-            }, 300);
-        }
-    });
+        return;
+    }
+});
+
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && typeof map !== 'undefined') {
+        setTimeout(() => {
+            google.maps.event.trigger(map, 'resize');
+            map.setCenter(map.getCenter());
+        }, 300);
+    }
+});
 </script>
 <!-- Load Google Maps API with callback to initMap -->
 <script async defer 

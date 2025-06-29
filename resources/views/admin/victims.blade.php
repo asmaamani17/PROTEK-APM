@@ -10,7 +10,6 @@
         height: 1em !important;
         vertical-align: middle;
     }
-</style>
 
     .card {
         border-radius: 1rem;
