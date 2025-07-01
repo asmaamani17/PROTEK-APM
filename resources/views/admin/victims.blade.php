@@ -41,7 +41,7 @@
 
 @section('content')
 <div class="container">
-    <h2 class="mb-4">Senarai Golongan Rentan</h2>
+    <h2 class="mb-4">Senarai Mangsa</h2>
 
     <div class="card p-4">
         <form method="GET" action="{{ route('admin.victims') }}" class="search-bar">

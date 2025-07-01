@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -51,29 +52,25 @@ class User extends Authenticatable
      * Get all rescue cases for this user (as victim)
      */
     public function rescueCases() {
-        return $this->hasMany(RescueCase::class, 'victim_id')->orderBy('created_at', 'desc');
+        return $this->hasMany(RescueCase::class, 'victim_id');
+    }
+    
+    public function vulnerableGroups() {
+        return $this->hasMany(VulnerableGroup::class);
     }
     
     /**
-     * Get the currently active rescue case (if any)
+     * Route notifications for the SMS channel.
+     *
+     * @param  \Illuminate\Notifications\Notification  $notification
+     * @return string
      */
-    public function activeRescueCase() {
-        return $this->hasOne(RescueCase::class, 'victim_id')
-            ->where('status', '!=', 'completed')
-            ->orderBy('created_at', 'desc')
-            ->with('rescuer');
+    public function routeNotificationForSms($notification)
+    {
+        // Return the phone number for SMS notifications
+        return $this->no_telefon;
     }
-    
-    /**
-     * Get all rescue cases where this user is the rescuer
-     */
-    public function assignedRescues() {
-        return $this->hasMany(RescueCase::class, 'rescuer_id');
-    }
-    
-    /**
-     * Get the vulnerable group record associated with the user.
-     */
+
     public function vulnerableGroup()
     {
         return $this->hasOne(VulnerableGroup::class, 'user_id');

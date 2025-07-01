@@ -18,6 +18,21 @@ class EventServiceProvider extends ServiceProvider
         Registered::class => [
             SendEmailVerificationNotification::class,
         ],
+        \App\Events\NewRescueCase::class => [
+            \App\Listeners\SendNewRescueCaseNotifications::class,
+        ],
+        \App\Events\RescueCaseStatusUpdated::class => [
+            \App\Listeners\SendRescueCaseStatusUpdate::class,
+        ],
+    ];
+    
+    /**
+     * The subscriber classes to register.
+     *
+     * @var array
+     */
+    protected $subscribe = [
+        // Add any event subscribers here
     ];
 
     /**
