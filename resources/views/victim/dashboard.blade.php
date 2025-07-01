@@ -11,22 +11,57 @@
       <button id="btn-sos" type="submit" class="btn btn-danger btn-lg px-5 py-3 fw-bold shadow" style="font-size: 2rem; border-radius: 1.5rem;">SOS</button>
     </form>
     <!-- Nama Mangsa -->
-    <div class="mt-2 fs-5"><strong>Nama Mangsa:</strong> {{ $user->name ?? 'Nama Mangsa' }}</div>
-    
-    <!-- Status Bantuan -->
-    @php
-        $status = $user->status ?? 'mohon_bantuan'; // Default status if not set
-        $statusText = [
-            'mohon_bantuan' => 'Mohon Bantuan',
-            'dalam_tindakan' => 'Dalam Tindakan',
-            'bantuan_selesai' => 'Bantuan Selesai'
-        ][$status] ?? 'Status Tidak Diketahui';
+    <div class="mt-2 fs-5"><strong>Nama Mangsa:</strong> {{ $victim->name ?? 'N/A' }}</div>
+     <!-- Status Bantuan -->
+     @php
+        // Get the latest case status or default to 'tiada_bantuan'
+        $latestCase = $user->rescueCases()->latest()->first();
+        $status = $latestCase->status ?? 'tiada_bantuan';
         
-        $statusClass = [
-            'mohon_bantuan' => 'bg-warning',
-            'dalam_tindakan' => 'bg-primary',
-            'bantuan_selesai' => 'bg-success'
-        ][$status] ?? 'bg-secondary';
+        // Status text and styling
+        $statusInfo = [
+            'tiada_bantuan' => [
+                'text' => 'Tiada Bantuan',
+                'class' => 'bg-secondary',
+                'icon' => 'fa-info-circle',
+                'description' => 'Belum ada permintaan bantuan'
+            ],
+            'mohon_bantuan' => [
+                'text' => 'Mohon Bantuan',
+                'class' => 'bg-warning',
+                'icon' => 'fa-exclamation-triangle',
+                'description' => 'Menunggu pengesahan admin'
+            ],
+            'dalam_tindakan' => [
+                'text' => 'Dalam Tindakan',
+                'class' => 'bg-primary',
+                'icon' => 'fa-people-carry',
+                'description' => 'Penyelamat sedang dalam perjalanan'
+            ],
+            'sedang_diselamatkan' => [
+                'text' => 'Sedang Diselamatkan',
+                'class' => 'bg-info',
+                'icon' => 'fa-ambulance',
+                'description' => 'Anda sedang dalam proses penyelamatan'
+            ],
+            'bantuan_selesai' => [
+                'text' => 'Bantuan Selesai',
+                'class' => 'bg-success',
+                'icon' => 'fa-check-circle',
+                'description' => 'Bantuan telah selesai diberikan'
+            ],
+            'tidak_ditemui' => [
+                'text' => 'Tidak Ditemui',
+                'class' => 'bg-dark',
+                'icon' => 'fa-question-circle',
+                'description' => 'Penyelamat tidak dapat menemui lokasi'
+            ]
+        ][$status] ?? [
+            'text' => 'Tiada Bantuan',
+            'class' => 'bg-secondary',
+            'icon' => 'fa-info-circle',
+            'description' => 'Status tidak dikenali'
+        ];
     @endphp
     <div class="mt-3">
         <div class="alert alert-{{ str_replace(['bg-'], '', $statusInfo['class']) }} d-flex align-items-center" role="alert">

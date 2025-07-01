@@ -301,66 +301,48 @@ class AdminController extends Controller
             ->whereHas('victim', function($query) use ($adminArea) {
                 $query->where('district', $adminArea);
             })
-            ->orderBy('created_at', 'desc')
             ->get();
+
+        // Get active rescue cases for the admin's area
+        $activeCases = $cases->whereIn('status', [
+            RescueCaseModel::STATUS_MOHON_BANTUAN,
+            RescueCaseModel::STATUS_DALAM_TINDAKAN,
+            RescueCaseModel::STATUS_SEDANG_DISELAMATKAN
+        ]);
 
         // Get vulnerable groups for admin's area from database
         $vulnerableGroups = \App\Models\VulnerableGroup::where('district', $adminArea)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->get()
-            ->map(function($item) {
-                // Map database fields to the format expected by the view
-                return [
-                    'serial_number' => $item->serial_number,
-                    'name' => $item->name,
-                    'lat' => (float)$item->latitude,
-                    'lng' => (float)$item->longitude,
-                    'gender' => $item->gender, // Include gender for info window
-                    'disability_category' => $item->disability_category, // Include original category for coloring
-                    'category' => $this->mapCategory($item->disability_category, $item->age_group, $item->oku_status)
-                ];
-            })
-            ->toArray();
-
-        // Group by district (though we're already filtering by district, this maintains the expected structure)
-        $victimsByDaerah = [
-            $adminArea => $vulnerableGroups
-        ];
-        
-        // If no vulnerable groups found for the district, return empty array to prevent errors
-        if (empty($vulnerableGroups)) {
-            $victimsByDaerah = [
-                $adminArea => []
-            ];
-        }
-
-        // Get only victims for admin's area and prepare for status list
-        $victims = collect($victimsByDaerah[$adminArea] ?? [])->map(function($victim) {
-            // Use the original disability category if available, otherwise use the mapped category
-            $victim['display_category'] = $victim['disability_category'] ?? $victim['category'];
-            return $victim;
-        })->toArray();
-
-        // Get daerah coordinates for pin placement
-        $daerahCoordinates = DaerahCoordinates::getAllCoordinates();
-        
-        // Get center coordinates for admin's area
-        $areaCenter = [
-            'BATU PAHAT' => ['lat' => 1.85, 'lng' => 102.93],
-            'SEGAMAT' => ['lat' => 2.50, 'lng' => 102.81],
-            'KOTA TINGGI' => ['lat' => 1.73, 'lng' => 103.90],
-            'KLUANG' => ['lat' => 2.03, 'lng' => 103.32]
-        ][$adminArea] ?? ['lat' => 2.03, 'lng' => 103.32]; // Default to Kluang if area not found
-
-        // Convert victims to array for map markers
-        $victimsWithCoordinates = $victims;
-
-        // Pass both variables to maintain backward compatibility
-        // Get rescuers for the admin's area
-        $rescuers = User::where('role', 'rescuer')
-            ->where('daerah', $adminArea)
             ->get();
+
+        // Prepare victims data for the view
+        $victims = $vulnerableGroups->map(function($item) use ($activeCases) {
+            $status = 'tiada_bantuan';
+            $case = $activeCases->firstWhere('victim_id', $item->id);
+            $notes = '';
+            $caseId = null;
+            
+            if ($case) {
+                $status = $case->status;
+                $notes = $case->notes;
+                $caseId = $case->id;
+            }
+            
+            return [
+                'id' => $item->id,
+                'serial_number' => $item->serial_number,
+                'name' => $item->name,
+                'lat' => (float)$item->latitude,
+                'lng' => (float)$item->longitude,
+                'gender' => $item->gender,
+                'disability_category' => $item->disability_category,
+                'category' => $this->mapCategory($item->disability_category, $item->age_group, $item->oku_status),
+                'status' => $status,
+                'notes' => $notes,
+                'case_id' => $caseId
+            ];
+        })->toArray();
 
         // Get IDs of rescuers assigned to active cases in the admin's area
         $assignedRescuerIds = $cases->where('status', '!=', 'completed')
@@ -373,8 +355,71 @@ class AdminController extends Controller
             $rescuer->status = $assignedRescuerIds->contains($rescuer->id) ? 'assigned' : 'available';
         });
 
-        // Pass both variables to maintain backward compatibility
-        return view('admin.dashboard', compact('cases', 'victims', 'victimsWithCoordinates', 'activeTab', 'rescuers'));
+        // Prepare statistics
+        $stats = [
+            'mohon_bantuan' => $cases->where('status', RescueCaseModel::STATUS_MOHON_BANTUAN)->count(),
+            'dalam_tindakan' => $cases->where('status', RescueCaseModel::STATUS_DALAM_TINDAKAN)->count(),
+            'sedang_diselamatkan' => $cases->where('status', RescueCaseModel::STATUS_SEDANG_DISELAMATKAN)->count(),
+            'bantuan_selesai' => $cases->where('status', 'bantuan_selesai')->count(),
+            'tidak_ditemui' => $cases->where('status', 'tidak_ditemui')->count(),
+            'jumlah_kes' => $cases->count()
+        ];
+
+        // Prepare victims with coordinates for the map
+        $victimsWithCoordinates = $vulnerableGroups->map(function($item) use ($activeCases) {
+            $case = $activeCases->firstWhere('victim_id', $item->id);
+            $status = $case ? $case->status : 'tiada_bantuan';
+            
+            // Get status text and color
+            $statusText = $this->getStatusText($status);
+            $statusColor = [
+                'tiada_bantuan' => 'secondary',
+                'mohon_bantuan' => 'danger',
+                'dalam_tindakan' => 'warning',
+                'sedang_diselamatkan' => 'info',
+                'bantuan_selesai' => 'success',
+                'tidak_ditemui' => 'dark'
+            ][$status] ?? 'secondary';
+            
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'address' => $item->address,
+                'phone_number' => $item->phone_number,
+                'latitude' => (float)$item->latitude,
+                'longitude' => (float)$item->longitude,
+                'status' => $status,
+                'status_text' => $statusText,
+                'status_color' => $statusColor,
+                'last_updated' => $case ? $case->updated_at->diffForHumans() : null,
+                'case_id' => $case ? $case->id : null,
+                'rescuer_name' => $case && $case->rescuer ? $case->rescuer->name : null,
+                'notes' => $case ? $case->notes : null,
+                'disability_category' => $item->disability_category,
+                'age_group' => $item->age_group,
+                'oku_status' => $item->oku_status,
+                'category' => $this->mapCategory($item->disability_category, $item->age_group, $item->oku_status)
+            ];
+        })->toArray();
+
+        // Get daerah coordinates for pin placement
+        $daerahCoordinates = DaerahCoordinates::getAllCoordinates();
+        
+        // Get center coordinates for admin's area
+        $areaCenter = DaerahCoordinates::getCoordinates($adminArea) 
+            ?: ['lat' => 2.03, 'lng' => 103.32]; // Default to Kluang if area not found
+
+        // Return view with all required data
+        return view('admin.dashboard', compact(
+            'victims',
+            'victimsWithCoordinates',
+            'rescuers',
+            'stats',
+            'activeTab',
+            'cases',
+            'areaCenter',
+            'daerahCoordinates'
+        ));
     }
 
 }

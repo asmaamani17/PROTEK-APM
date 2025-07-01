@@ -48,11 +48,8 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-    /**
-     * Get all rescue cases for this user (as victim)
-     */
     public function rescueCases() {
-        return $this->hasMany(RescueCase::class, 'victim_id');
+        return $this->hasMany(RescueCase::class, 'rescuer_id');
     }
     
     public function vulnerableGroups() {
