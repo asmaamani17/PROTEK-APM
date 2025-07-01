@@ -113,7 +113,7 @@
     </div>
 </div>
 
-<div class="row g-3">
+  <div class="row g-3">
     @php
         $totalCases = $cases->count();
         $activeCases = $cases->where('status', '!=', 'completed')->count();
@@ -122,17 +122,20 @@
     @endphp
     
     @foreach([
-      ['label' => 'Mohon Bantuan', 'bg' => 'danger', 'count' => $stats['mohon_bantuan'] ?? 0],
-      ['label' => 'Dalam Tindakan', 'bg' => 'primary', 'count' => $stats['dalam_tindakan'] ?? 0],
-      ['label' => 'Sedang Diselamatkan', 'bg' => 'warning', 'count' => $stats['sedang_diselamatkan'] ?? 0],
-      ['label' => 'Bantuan Selesai', 'bg' => 'success', 'count' => $stats['bantuan_selesai'] ?? 0],
-      ['label' => 'Tidak Ditemui', 'bg' => 'dark', 'count' => $stats['tidak_ditemui'] ?? 0],
-      ['label' => 'Jumlah Kes', 'bg' => 'secondary', 'count' => $stats['jumlah_kes'] ?? 0],
+      ['label' => 'Belum Ambil Tindakan', 'bg' => 'primary', 'count' => $stats['pending'] ?? 0],
+      ['label' => 'Sedang Diselamatkan', 'bg' => 'warning', 'count' => $stats['in_progress'] ?? 0],
+      ['label' => 'Telah Diselamatkan', 'bg' => 'success', 'count' => $stats['rescued'] ?? 0],
+      ['label' => 'Tidak Ditemui', 'bg' => 'danger', 'count' => $stats['not_found'] ?? 0],
+      ['label' => 'Kes Selesai', 'bg' => 'dark', 'count' => $stats['completed'] ?? 0],
+      ['label' => 'Jumlah Kes', 'bg' => 'secondary', 'count' => $stats['total'] ?? 0],
     ] as $stat)
-    <div class="col-12 col-md-4 col-lg-2">
-      <div class="p-3 text-white rounded text-center" style="background-color: var(--bs-{{ $stat['bg'] }});">
-        <div>{{ $stat['label'] }}</div>
-        <div class="fs-4 fw-bold">{{ $stat['count'] }}</div>
+    <div class="col-6 col-md-4 col-lg-2">
+      <div class="p-3 text-white rounded text-center h-100 d-flex flex-column justify-content-center" style="background-color: var(--bs-{{ $stat['bg'] }});">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+          <i class="fas fa-{{ $stat['icon'] }} me-2"></i>
+          <div>{{ $stat['label'] }}</div>
+        </div>
+        <div class="display-6 fw-bold">{{ $stat['count'] }}</div>
       </div>
     </div>
     @endforeach
@@ -219,6 +222,7 @@
             <th>Nama</th>
             <th>Kategori</th>
             <th>Status</th>
+            <th>Tindakan</th>
           </tr>
         </thead>
         <tbody>
@@ -242,29 +246,25 @@
             <td>{{ $victim['serial_number'] ?? '-' }}</td>
             <td>{{ $victim['name'] ?? '-' }}</td>
             <td>{{ $victim['disability_category'] ?? $victim['category'] ?? '-' }}</td>
-            <td class="cursor-pointer">
-              <div class="info-window">
-                <h5>{{ $victim['name'] ?? 'Mangsa' }}</h5>
-                <div class="status-badge {{ $statusClass }} text-white p-1 rounded mb-2">
-                    {{ $statusText }}
-                </div>
-                <div class="status-update mb-2">
-                    <select class="form-select form-select-sm" onchange="updateStatus({{ $victim['id'] }}, this.value)" data-request-id="{{ $victim['id'] }}">
-                        <option value="mohon_bantuan" {{ $victim['status'] == 'mohon_bantuan' ? 'selected' : '' }}>Mohon Bantuan</option>
-                        <option value="dalam_tindakan" {{ $victim['status'] == 'dalam_tindakan' ? 'selected' : '' }}>Dalam Tindakan</option>
-                        <option value="sedang_diselamatkan" {{ $victim['status'] == 'sedang_diselamatkan' ? 'selected' : '' }}>Sedang Diselamatkan</option>
-                        <option value="bantuan_selesai" {{ $victim['status'] == 'bantuan_selesai' ? 'selected' : '' }}>Bantuan Selesai</option>
-                    </select>
-                </div>
-              </div>
-              @if(!empty($victim['notes']))
-                <i class="fas fa-info-circle ms-1" title="{{ $victim['notes'] }}"></i>
-              @endif
+            <td>
+              @php
+                $status = $victim['status'] ?? 'pending';
+                $statusMap = [
+                  'pending' => ['Belum Ambil Tindakan','primary'],
+                  'in_progress' => ['Sedang Diselamatkan','warning'],
+                  'rescued' => ['Diselamatkan','success'],
+                  'not_found' => ['Tidak Ditemui','danger'],
+                  'completed' => ['Kes Selesai','dark'],
+                ];
+                $statusText = $statusMap[$status][0] ?? $status;
+                $statusClass = 'bg-' . ($statusMap[$status][1] ?? 'secondary');
+              @endphp
+              <span class="badge {{ $statusClass }}">{{ $statusText }}</span>
             </td>
           </tr>
           @empty
           <tr>
-            <td colspan="4" class="text-center">Tiada rekod mangsa dijumpai</td>
+            <td colspan="5" class="text-center">Tiada rekod mangsa dijumpai</td>
           </tr>
           @endforelse
         </tbody>
