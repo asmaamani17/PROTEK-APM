@@ -25,6 +25,15 @@ class Kernel extends ConsoleKernel
         require base_path('routes/console.php');
     }
 
+    /**
+     * The Artisan commands provided by your application.
+     *
+     * @var array
+     */
+    protected $commands = [
+        \App\Console\Commands\TestSmsCommand::class,
+    ];
+
     protected $routeMiddleware = [
     // ...
     'role' => \App\Http\Middleware\RoleMiddleware::class,

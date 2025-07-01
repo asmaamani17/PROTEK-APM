@@ -7,30 +7,81 @@
       @csrf
       <input type="hidden" name="lat" id="lat">
       <input type="hidden" name="lng" id="lng">
+      <input type="hidden" name="victim_id" value="{{ $victim->id ?? '' }}">
       <button id="btn-sos" type="submit" class="btn btn-danger btn-lg px-5 py-3 fw-bold shadow" style="font-size: 2rem; border-radius: 1.5rem;">SOS</button>
     </form>
     <!-- Nama Mangsa -->
-    <div class="mt-2 fs-5"><strong>Nama Mangsa:</strong> {{ $user->name ?? 'Nama Mangsa' }}</div>
-    
-    <!-- Status Bantuan -->
-    @php
-        $status = $user->status ?? 'mohon_bantuan'; // Default status if not set
-        $statusText = [
-            'mohon_bantuan' => 'Mohon Bantuan',
-            'dalam_tindakan' => 'Dalam Tindakan',
-            'bantuan_selesai' => 'Bantuan Selesai'
-        ][$status] ?? 'Status Tidak Diketahui';
+    <div class="mt-2 fs-5"><strong>Nama Mangsa:</strong> {{ $victim->name ?? 'N/A' }}</div>
+     <!-- Status Bantuan -->
+     @php
+        // Get the latest case status or default to 'tiada_bantuan'
+        $latestCase = $user->rescueCases()->latest()->first();
+        $status = $latestCase->status ?? 'tiada_bantuan';
         
-        $statusClass = [
-            'mohon_bantuan' => 'bg-warning',
-            'dalam_tindakan' => 'bg-primary',
-            'bantuan_selesai' => 'bg-success'
-        ][$status] ?? 'bg-secondary';
+        // Status text and styling
+        $statusInfo = [
+            'tiada_bantuan' => [
+                'text' => 'Tiada Bantuan',
+                'class' => 'bg-secondary',
+                'icon' => 'fa-info-circle',
+                'description' => 'Belum ada permintaan bantuan'
+            ],
+            'mohon_bantuan' => [
+                'text' => 'Mohon Bantuan',
+                'class' => 'bg-warning',
+                'icon' => 'fa-exclamation-triangle',
+                'description' => 'Menunggu pengesahan admin'
+            ],
+            'dalam_tindakan' => [
+                'text' => 'Dalam Tindakan',
+                'class' => 'bg-primary',
+                'icon' => 'fa-people-carry',
+                'description' => 'Penyelamat sedang dalam perjalanan'
+            ],
+            'sedang_diselamatkan' => [
+                'text' => 'Sedang Diselamatkan',
+                'class' => 'bg-info',
+                'icon' => 'fa-ambulance',
+                'description' => 'Anda sedang dalam proses penyelamatan'
+            ],
+            'bantuan_selesai' => [
+                'text' => 'Bantuan Selesai',
+                'class' => 'bg-success',
+                'icon' => 'fa-check-circle',
+                'description' => 'Bantuan telah selesai diberikan'
+            ],
+            'tidak_ditemui' => [
+                'text' => 'Tidak Ditemui',
+                'class' => 'bg-dark',
+                'icon' => 'fa-question-circle',
+                'description' => 'Penyelamat tidak dapat menemui lokasi'
+            ]
+        ][$status] ?? [
+            'text' => 'Tiada Bantuan',
+            'class' => 'bg-secondary',
+            'icon' => 'fa-info-circle',
+            'description' => 'Status tidak dikenali'
+        ];
     @endphp
-    <div class="mt-2">
-        <span class="badge {{ $statusClass }} text-white fs-6 p-2">
-            <i class="fas fa-info-circle me-1"></i> Status: {{ $statusText }}
-        </span>
+    <div class="mt-3">
+        <div class="alert alert-{{ str_replace(['bg-'], '', $statusInfo['class']) }} d-flex align-items-center" role="alert">
+            <i class="fas {{ $statusInfo['icon'] }} me-2 fs-4"></i>
+            <div>
+                <h5 class="alert-heading mb-1">Status: {{ $statusInfo['text'] }}</h5>
+                <p class="mb-0 small">{{ $statusInfo['description'] }}</p>
+                @if($latestCase && $latestCase->rescuers->isNotEmpty())
+                    <div class="mt-2">
+                        <strong>Penyelamat:</strong>
+                        @foreach($latestCase->rescuers as $rescuer)
+                            <div class="d-flex align-items-center mt-1">
+                                <i class="fas fa-user-shield me-2"></i>
+                                <span>{{ $rescuer->user->name }} ({{ $rescuer->user->no_telefon }})</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
     </div>
   </div>
 
@@ -86,7 +137,7 @@
             <a href="tel:994" class="list-group-item list-group-item-action">
               <div class="d-flex w-100 justify-content-between">
                 <h6 class="mb-1"><i class="fas fa-fire-extinguisher text-danger me-2"></i>Bomba & Penyelamat</h6>
-                <span class="badge bg-danger rounded-pill"><i class="fas fa-phone-alt me-1"></i> 999</span>
+                <span class="badge bg-danger rounded-pill"><i class="fas fa-phone-alt me-1"></i> 994</span>
               </div>
               <small class="text-muted">Untuk kebakaran dan penyelamatan</small>
             </a>
@@ -123,43 +174,440 @@
   </div>
 @endsection
 
+@push('styles')
+<style>
+  .btn-sos-active {
+    animation: pulse 1.5s infinite;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(220, 53, 69, 0.3);
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+  }
+  .sos-sent {
+    background-color: #dc3545 !important;
+    color: white !important;
+  }
+</style>
+@endpush
+
 @push('scripts')
 <script src="https://cdn.botpress.cloud/webchat/v3.0/inject.js"></script>
 <script src="https://files.bpcontent.cloud/2025/06/22/18/20250622185105-PX8MXXTO.js"></script>
+<script src="https://js.pusher.com/7.0/pusher.min.js"></script>
 <script>
-  // Initialize chatbot
-  window.botpress.init({
-    "botId": "690f8920-8ec6-4626-aa50-bb256d1b9da2",
-    "hideWidget": true, // Hide the default launcher
-    "configuration": {
-      "version": "v1",
-      "botName": "AkakPROTEK",
-      "botAvatar": "https://files.bpcontent.cloud/2025/06/23/00/20250623001049-OJ0WLQ8J.jpeg",
-      "color": "#f76b15",
-      "variant": "solid",
-      "headerVariant": "solid",
-      "themeMode": "light",
-      "fontFamily": "inter",
-      "radius": 4,
-      "feedbackEnabled": false,
-      "footer": "[⚡ by Botpress](https://botpress.com/?from=webchat)"
-    },
-    "clientId": "7067c78f-b738-4cbd-b2d7-ceca8fce2d43"
-  });
+    // Initialize Pusher
+    const pusher = new Pusher('{{ config('broadcasting.connections.pusher.key') }}', {
+        cluster: '{{ config('broadcasting.connections.pusher.options.cluster') }}',
+        encrypted: true
+    });
 
-  // Add event listener to custom button to open chatbot
+    // Subscribe to the user's private channel
+    const channel = pusher.subscribe('private-victim-{{ auth()->id() }}');
+
+    // Listen for status updates
+    channel.bind('RescueCaseStatusUpdated', function(data) {
+        console.log('Status updated:', data);
+        
+        // Show notification
+        const statusInfo = getStatusInfo(data.status);
+        showToast(`Status bantuan telah dikemas kini: ${statusInfo.text}`, 
+                 data.status === 'bantuan_selesai' ? 'success' : 'info');
+        
+        // Reload the page to show updated status
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    });
+
+    // Helper function to get status info
+    function getStatusInfo(status) {
+        const statuses = {
+            'tiada_bantuan': { text: 'Tiada Bantuan', class: 'secondary' },
+            'mohon_bantuan': { text: 'Mohon Bantuan', class: 'warning' },
+            'dalam_tindakan': { text: 'Dalam Tindakan', class: 'primary' },
+            'sedang_diselamatkan': { text: 'Sedang Diselamatkan', class: 'info' },
+            'bantuan_selesai': { text: 'Bantuan Selesai', class: 'success' },
+            'tidak_ditemui': { text: 'Tidak Ditemui', class: 'dark' }
+        };
+        return statuses[status] || { text: 'Status Tidak Dikenali', class: 'secondary' };
+    }
+</script>
+<script>
+  // Global map variables
+  let map;
+  let currentMarker;
+  let isSosActive = false;
+
+  // Initialize the map
+  function initMap() {
+    // Check if map element exists
+    if (!document.getElementById('map-mangsa')) {
+      console.error('Map container not found');
+      return;
+    }
+
+    // Victim info from controller
+    const victim = @json($victim);
+    
+    // Default center position (Kota Tinggi)
+    const defaultCenter = { lat: 1.7317, lng: 103.8997 }; 
+    // Get current location from victim data
+    const currentLat = parseFloat(victim?.lat || victim?.latitude || 0);
+    const currentLng = parseFloat(victim?.lng || victim?.longitude || 0);
+    
+    // Determine center position - use current location if available, otherwise use default
+    let centerPosition = defaultCenter;
+    if (!isNaN(currentLat) && !isNaN(currentLng)) {
+      centerPosition = { lat: currentLat, lng: currentLng };
+    }
+
+    try {
+      // Create map with initial zoom level 6 (more zoomed out)
+      map = new google.maps.Map(document.getElementById('map-mangsa'), {
+        zoom: 14,
+        center: centerPosition,
+        mapTypeId: 'roadmap',
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControl: true,
+        zoomControlOptions: {
+          position: google.maps.ControlPosition.RIGHT_BOTTOM,
+          style: 'SMALL'
+        },
+        styles: [
+          {
+            featureType: 'all',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }]
+          },
+          {
+            featureType: 'road',
+            elementType: 'geometry',
+            stylers: [{ color: '#f5f5f5' }]
+          },
+          {
+            featureType: 'road.local',
+            elementType: 'geometry',
+            stylers: [{ color: '#ffffff' }]
+          },
+          {
+            featureType: 'water',
+            elementType: 'geometry',
+            stylers: [{ color: '#e0e0e0' }]
+          },
+          {
+            featureType: 'landscape',
+            elementType: 'geometry',
+            stylers: [{ color: '#f9f9f9' }]
+          },
+          {
+            featureType: 'poi',
+            elementType: 'geometry',
+            stylers: [{ visibility: 'off' }]
+          }
+        ]
+      });
+
+      // Add current location marker if available
+      if (!isNaN(currentLat) && !isNaN(currentLng)) {
+        // Create marker for current location
+        const currentMarker = new google.maps.Marker({
+          position: { lat: currentLat, lng: currentLng },
+          map: map,
+          title: (victim.name || 'Mangsa') + ' (Kategori: ' + victim.disability_category + ')',
+          icon: {
+            url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"%3E%3Cpath d="M24 4c-7.73 0-14 6.27-14 14 0 10.5 14 26 14 26s14-15.5 14-26c0-7.73-6.27-14-14-14zm0 7c3.86 0 7 3.14 7 7s-3.14 7-7 7-7-3.14-7-7 3.14-7 7-7z" fill="%23ea4335"/%3E%3Ccircle cx="24" cy="18" r="5" fill="%23ffffff"/%3E%3C/svg%3E',
+            scaledSize: new google.maps.Size(40, 40),
+            anchor: new google.maps.Point(20, 40)
+          },
+          animation: google.maps.Animation.DROP
+        });
+        
+        const infoWindowCurrent = new google.maps.InfoWindow({
+          content: `<b>${victim.name || 'Mangsa'}</b><br>ID: ${victim.id}<br>Kategori: ${victim.disability_category}<br>${currentLat.toFixed(6)}, ${currentLng.toFixed(6)}`
+        });
+        
+        currentMarker.addListener('click', () => {
+          infoWindowCurrent.setPosition({ lat: currentLat, lng: currentLng });
+          infoWindowCurrent.open(map);
+        });
+        infoWindowCurrent.setPosition({ lat: currentLat, lng: currentLng });
+        infoWindowCurrent.open(map);
+        
+
+      }
+
+      // Set map center to the current location with the defined zoom level
+      if (!isNaN(currentLat) && !isNaN(currentLng)) {
+        map.setCenter({ lat: currentLat, lng: currentLng });
+      }
+
+    } catch (error) {
+      console.error('Map initialization error:', error);
+      alert('Error initializing map: ' + error.message);
+      
+      // Show error message in place of map
+      const mapElement = document.getElementById('map-mangsa');
+      if (mapElement) {
+        mapElement.innerHTML = `
+          <div style="padding: 20px; text-align: center; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+            <h4>Error loading map</h4>
+            <p>Please check your internet connection and make sure you have a valid Google Maps API key with billing enabled.</p>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // Error handling for Google Maps API
+  window.gm_authFailure = function() {
+    alert('Google Maps API error: Please check your API key and billing status.');
+    
+    // Show error message in place of map
+    const mapElement = document.getElementById('map-mangsa');
+    if (mapElement) {
+      mapElement.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+          <h4>Google Maps API Error</h4>
+          <p>Please check your API key and billing status in Google Cloud Console.</p>
+        </div>
+      `;
+    }
+  };
+
+  // Add toast container to the page
+  const toastContainer = document.createElement('div');
+  toastContainer.id = 'toast-container';
+  toastContainer.className = 'position-fixed top-0 end-0 p-3';
+  toastContainer.style.zIndex = '1100';
+  document.body.appendChild(toastContainer);
+
+  // Function to show toast
+  function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast show ${type === 'error' ? 'bg-danger' : 'bg-success'} text-white mb-2`;
+    toast.role = 'alert';
+    toast.style.minWidth = '300px';
+    
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="fas ${type === 'error' ? 'fa-exclamation-triangle' : 'fa-check-circle'} me-2"></i>
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    `;
+    
+    document.getElementById('toast-container').appendChild(toast);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      toast.remove();
+    }, 5000);
+    
+    return toast;
+  }
+
+  // Handle form submission
   document.addEventListener('DOMContentLoaded', function() {
-    const chatbotButton = document.getElementById('btn-chatbot');
-    if (chatbotButton) {
-      chatbotButton.addEventListener('click', function() {
-        window.botpress.open();
+    const sosButton = document.getElementById('btn-sos');
+    const sosForm = document.getElementById('sosForm');
+    
+    if (sosButton && sosForm) {
+      // Handle form submission
+      sosForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Prevent multiple clicks
+        if (isSosActive) return;
+        
+        try {
+          // Visual feedback for SOS activation
+          isSosActive = true;
+          sosButton.classList.add('btn-sos-active', 'sos-sent');
+          const originalText = sosButton.innerHTML;
+          sosButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Menghantar SOS...';
+          
+          // Get current location with timeout and high accuracy
+          const position = await new Promise((resolve, reject) => {
+            if (navigator.geolocation) {
+              const options = {
+                enableHighAccuracy: true,  // Request high accuracy
+                timeout: 10000,           // 10 seconds timeout
+                maximumAge: 0             // Force fresh location
+              };
+              
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  console.log('Got position:', position);
+                  resolve({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                  });
+                },
+                (error) => {
+                  console.error('Geolocation error:', error);
+                  let errorMessage = 'Gagal mendapatkan lokasi';
+                  switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                      errorMessage = 'Akses lokasi ditolak. Sila benarkan akses lokasi untuk aplikasi ini.';
+                      break;
+                    case error.POSITION_UNAVAILABLE:
+                      errorMessage = 'Maklumat lokasi tidak tersedia. Sila pastikan GPS dihidupkan.';
+                      break;
+                    case error.TIMEOUT:
+                      errorMessage = 'Masa untuk mendapatkan lokasi telah tamat. Sila cuba lagi.';
+                      break;
+                  }
+                  reject(new Error(errorMessage));
+                },
+                options
+              );
+            } else {
+              reject(new Error('Pelayar anda tidak menyokong geolokasi'));
+            }
+          });
+
+          // Update form with location data
+          document.getElementById('lat').value = position.lat;
+          document.getElementById('lng').value = position.lng;
+          
+          // Show sending message
+          sosButton.innerHTML = '<i class="fas fa-check-circle me-2"></i> SOS Dihantar!';
+          
+          // Get CSRF token from meta tag or form input
+          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || 
+                           document.querySelector('input[name="_token"]')?.value;
+          
+          if (!csrfToken) {
+            console.error('CSRF token not found');
+            showToast('Ralat sistem. Sila muat semula halaman.', 'error');
+            return;
+          }
+          
+          // Submit the form via fetch to handle the response
+          const formData = new FormData(sosForm);
+          
+          fetch(sosForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRF-TOKEN': csrfToken
+            }
+          })
+          .then(response => {
+            if (!response.ok) {
+              return response.json().then(err => { throw err; });
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (data.success) {
+              showToast(data.message || 'Permintaan bantuan berjaya dihantar!', 'success');
+              
+              // Redirect to case status if case_id is provided
+              if (data.case_id) {
+                window.location.href = `/victim/case/${data.case_id}`;
+              }
+            } else {
+              showToast(data.message || 'Ralat menghantar permintaan bantuan. Sila cuba lagi.', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            const errorMessage = error.message || 'Ralat menghantar permintaan bantuan. Sila cuba lagi.';
+            showToast(errorMessage, 'error');
+          })
+          .finally(() => {
+            // Reset button state after 2 seconds
+            setTimeout(() => {
+              sosButton.innerHTML = originalText;
+              sosButton.classList.remove('sos-sent', 'btn-sos-active');
+              isSosActive = false;
+            }, 2000);
+          });
+          
+        } catch (error) {
+          console.error('Error getting location:', error);
+          
+          // Show error state
+          sosButton.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i> Ralat! Cuba Lagi';
+          sosButton.classList.remove('btn-sos-active');
+          sosButton.classList.add('btn-danger');
+          
+          // Reset button after delay
+          setTimeout(() => {
+            sosButton.innerHTML = originalText;
+            sosButton.classList.remove('sos-sent');
+            isSosActive = false;
+          }, 2000);
+          
+          // Show specific error message
+          console.error('Location error details:', error);
+          showToast(error.message || 'Gagal mendapatkan lokasi. Sila pastikan GPS dihidupkan dan akses lokasi dibenarkan.', 'error');
+          
+          // Reset button state immediately
+          sosButton.innerHTML = originalText;
+          sosButton.classList.remove('sos-sent', 'btn-sos-active');
+          isSosActive = false;
+        }
       });
     }
   });
 </script>
+
+<script>
+// Initialize Google Maps API if not already loaded
+if (!window.googleMapsAPI) {
+    window.googleMapsAPI = new Promise((resolve) => {
+        if (window.google && window.google.maps) {
+            resolve(window.google.maps);
+            return;
+        }
+        
+        // Store the original initMap if it exists
+        const originalInitMap = window.initMap;
+        
+        window.initMap = function() {
+            if (originalInitMap) originalInitMap();
+            resolve(window.google.maps);
+        };
+        
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}&callback=initMap&libraries=marker,places`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = () => {
+            console.error('Failed to load Google Maps API');
+            resolve(null);
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
+// Initialize the map when the API is ready
+window.googleMapsAPI.then((googleMaps) => {
+    if (!googleMaps) {
+        console.error('Google Maps API failed to load');
+        return;
+    }
+    
+    // Call the original initMap function if it exists
+    if (typeof initMap === 'function') {
+        initMap();
+    }
+});
+</script>
 @endpush
-
-
 
 @push('styles')
 <style>
@@ -193,357 +641,4 @@
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   }
 </style>
-@endpush
-
-@push('scripts')
-<script>
-  // Google Map and markers
-  let map;
-  let currentMarker;
-  let profileMarker;
-
-  function initMap() {
-    // Victim info
-    const victim = @json($victims)[0];
-    // Current location (from SOS/RescueCase)
-    const currentLat = parseFloat(victim.lat || victim.latitude);
-    const currentLng = parseFloat(victim.lng || victim.longitude);
-    // Profile location (from vulnerable_groups)
-    const profileLat = parseFloat(victim.profile_lat || victim.profile_latitude || victim.latitude);
-    const profileLng = parseFloat(victim.profile_lng || victim.profile_longitude || victim.longitude);
-    
-    // Default to current location if available, else profile
-    const centerPosition = !isNaN(currentLat) && !isNaN(currentLng)
-      ? { lat: currentLat, lng: currentLng }
-      : { lat: profileLat, lng: profileLng };
-
-    // Initialize map
-    map = new google.maps.Map(document.getElementById('map-mangsa'), {
-      center: centerPosition,
-      zoom: 14
-    });
-
-    // Place current location marker (red)
-    if (!isNaN(currentLat) && !isNaN(currentLng)) {
-      currentMarker = new google.maps.Marker({
-        position: { lat: currentLat, lng: currentLng },
-        map: map,
-        title: (victim.name || 'Mangsa') + ' (Lokasi Semasa)',
-        icon: {
-          url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-          scaledSize: new google.maps.Size(32, 32)
-        }
-      });
-      const infoWindowCurrent = new google.maps.InfoWindow({
-        content: `<b>${victim.name || 'Mangsa'}</b><br>Lokasi Semasa (SOS):<br>${currentLat.toFixed(6)}, ${currentLng.toFixed(6)}`
-      });
-      currentMarker.addListener('click', () => infoWindowCurrent.open(map, currentMarker));
-      infoWindowCurrent.open(map, currentMarker);
-    }
-
-    // Place profile location marker (blue)
-    if (!isNaN(profileLat) && !isNaN(profileLng)) {
-      profileMarker = new google.maps.Marker({
-        position: { lat: profileLat, lng: profileLng },
-        map: map,
-        title: (victim.name || 'Mangsa') + ' (Alamat Profil)',
-        icon: {
-          url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-          scaledSize: new google.maps.Size(32, 32)
-        }
-      });
-      const infoWindowProfile = new google.maps.InfoWindow({
-        content: `<b>${victim.name || 'Mangsa'}</b><br>Alamat Profil (vulnerable_groups):<br>${profileLat.toFixed(6)}, ${profileLng.toFixed(6)}`
-      });
-      profileMarker.addListener('click', () => infoWindowProfile.open(map, profileMarker));
-    }
-
-    // Fit map to show both markers
-    const bounds = new google.maps.LatLngBounds();
-    if (!isNaN(currentLat) && !isNaN(currentLng)) bounds.extend({ lat: currentLat, lng: currentLng });
-    if (!isNaN(profileLat) && !isNaN(profileLng)) bounds.extend({ lat: profileLat, lng: profileLng });
-    if (!bounds.isEmpty()) map.fitBounds(bounds);
-  }
-  let defaultPosition = { lat: {{ $coordinates['lat'] ?? 2.6485 }}, lng: {{ $coordinates['lng'] ?? 103.8350 }} };
-  let userPosition = null;
-  
-  // Victims data from controller
-  const victims = @json($victims);
-  
-  // Error handling for Google Maps API
-  window.gm_authFailure = function() {
-    alert('Google Maps API error: Please check your API key and billing status.');
-  };
-
-  // Initialize the map
-  function initMap() {
-    try {
-      // Create map centered on default position
-      map = new google.maps.Map(document.getElementById('map-mangsa'), {
-        zoom: 12,
-        center: defaultPosition,
-        mapTypeId: 'roadmap',
-        mapTypeControl: true,
-        streetViewControl: true,
-        fullscreenControl: true,
-        zoomControl: true,
-        zoomControlOptions: {
-          position: google.maps.ControlPosition.RIGHT_BOTTOM
-        },
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }]
-          },
-          {
-            featureType: 'transit',
-            elementType: 'labels',
-            stylers: [{ visibility: 'off' }]
-          }
-        ]
-      });
-
-      // Add victim markers to the map
-      addVictimMarkers();
-
-      // Try to get user's current location
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          function(position) {
-            userPosition = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            };
-            
-            // Update hidden form fields with current location
-            document.getElementById('lat').value = userPosition.lat;
-            document.getElementById('lng').value = userPosition.lng;
-            
-            // Add/update user location marker
-            updateUserLocationMarker();
-            
-            // Center map to show both user and victim if available
-            centerMapOnLocations();
-          },
-          function(error) {
-            console.error('Geolocation error:', error);
-            handleLocationError();
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0
-          }
-        );
-      } else {
-        // Browser doesn't support geolocation
-        console.log('Geolocation is not supported by this browser');
-        handleLocationError();
-      }
-    } catch (error) {
-      console.error('Map initialization error:', error);
-      document.getElementById('map-mangsa').innerHTML = `
-        <div style="padding: 20px; text-align: center; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
-          <h4>Error loading map</h4>
-          <p>Please check your internet connection and make sure you have a valid Google Maps API key with billing enabled.</p>
-        </div>
-      `;
-    }
-  }
-  
-  // Add or update user location marker
-  function updateUserLocationMarker() {
-    if (!userPosition) return;
-    
-    if (userMarker) {
-      userMarker.setPosition(userPosition);
-    } else {
-      userMarker = new google.maps.Marker({
-        position: userPosition,
-        map: map,
-        title: 'Lokasi Semasa: {{ $user->name ?? "Anda" }}',
-        icon: {
-          url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-          scaledSize: new google.maps.Size(30, 30)
-        }
-      });
-      
-      // Add info window for user location
-      const infoWindow = new google.maps.InfoWindow({
-        content: `
-          <div style="padding: 10px;">
-            <h6 style="margin: 0 0 5px 0; color: #d9534f;">Lokasi Semasa</h6>
-            <p style="margin: 0;">{{ $user->name ?? "Anda" }}</p>
-            <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #666;">
-              ${userPosition.lat.toFixed(6)}, ${userPosition.lng.toFixed(6)}
-            </p>
-          </div>
-        `
-      });
-      
-      userMarker.addListener('click', function() {
-        infoWindow.open(map, userMarker);
-      });
-      
-      // Open info window by default
-      infoWindow.open(map, userMarker);
-    }
-  }
-  
-  // Center map to show both user and victim locations
-  function centerMapOnLocations() {
-    const bounds = new google.maps.LatLngBounds();
-    let hasLocations = false;
-    
-    // Add victim location if available
-    if (victims && victims.length > 0) {
-      const victim = victims[0];
-      const lat = victim.lat || victim.latitude;
-      const lng = victim.lng || victim.longitude;
-      
-      if (lat && lng) {
-        bounds.extend({
-          lat: parseFloat(lat),
-          lng: parseFloat(lng)
-        });
-        hasLocations = true;
-        console.log('Added victim location to bounds:', { lat, lng });
-      } else {
-        console.error('Invalid victim coordinates in centerMapOnLocations:', victim);
-      }
-    }
-    
-    // Add user location if available
-    if (userPosition) {
-      bounds.extend(userPosition);
-      hasLocations = true;
-    }
-    
-    // Fit bounds if we have valid locations
-    if (hasLocations) {
-      map.fitBounds(bounds);
-      
-      // Don't zoom in too far if points are close
-      const zoom = map.getZoom();
-      if (zoom > 14) {
-        map.setZoom(14);
-      }
-    } else {
-      // Fallback to default position
-      map.setCenter(defaultPosition);
-      map.setZoom(10);
-    }
-  }
-  
-  // Add marker for the specific victim from the database
-  function addVictimMarkers() {
-    console.log('Victims data:', victims);
-    
-    if (!victims || victims.length === 0) {
-      console.log('No victim data found in the database');
-      return;
-    }
-    
-    // Get the first (and only) victim from the array
-    const victim = victims[0];
-    
-    // Defensive: parse and validate coordinates
-    const lat = parseFloat(victim.lat || victim.latitude);
-    const lng = parseFloat(victim.lng || victim.longitude);
-    console.log('Victim object:', victim);
-    console.log('Parsed lat/lng:', lat, lng);
-    
-    if (isNaN(lat) || isNaN(lng)) {
-      console.error('Invalid victim coordinates:', victim);
-      return;
-    }
-    
-    const victimPosition = { lat, lng };
-    
-    console.log('Adding marker for victim:', victim.name || 'Unnamed', 'at', victimPosition);
-    
-    // Create marker for the victim
-    const marker = new google.maps.Marker({
-      position: victimPosition,
-      map: map,
-      title: `${victim.name || 'Mangsa'} (${victim.disability_category || 'Tiada maklumat'})`,
-      icon: {
-        url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-        scaledSize: new google.maps.Size(30, 30)
-      }
-    });
-    
-    // Create info window content
-    const infoContent = `
-      <div style="padding: 10px; min-width: 200px;">
-        <h6 style="margin: 0 0 5px 0; color: #0d6efd;">${victim.name || 'N/A'}</h6>
-        <p style="margin: 0 0 5px 0; font-size: 0.9em;">
-          <strong>No. Telefon:</strong> ${victim.phone_number || 'Tiada'}<br>
-          <strong>Kategori:</strong> ${victim.disability_category || 'Tiada maklumat'}
-        </p>
-        <p style="margin: 5px 0 0 0; font-size: 0.8em; color: #666;">
-          ${victimPosition.lat.toFixed(6)}, ${victimPosition.lng.toFixed(6)}
-        </p>
-      </div>
-    `;
-    
-    const infoWindow = new google.maps.InfoWindow({
-      content: infoContent
-    });
-    
-    // Show info window on marker click
-    marker.addListener('click', () => {
-      if (window.currentInfoWindow) {
-        window.currentInfoWindow.close();
-      }
-      infoWindow.open(map, marker);
-      window.currentInfoWindow = infoWindow;
-    });
-    
-    // Open info window by default
-    infoWindow.open(map, marker);
-    window.currentInfoWindow = infoWindow;
-  }
-  
-  function handleLocationError() {
-    // If we have a victim, center on their location
-    if (victims && victims.length > 0 && victims[0].lat && victims[0].lng) {
-      const victimPosition = {
-        lat: parseFloat(victims[0].lat),
-        lng: parseFloat(victims[0].lng)
-      };
-      map.setCenter(victimPosition);
-      map.setZoom(14);
-      console.log('Centered on victim location due to geolocation error');
-    } else {
-      // Fallback to default position
-      map.setCenter(defaultPosition);
-      map.setZoom(10);
-      console.log('Using default position - no valid victim location');
-    }
-    
-    // Clear any existing user marker since we couldn't get the user's location
-    if (userMarker) userMarker.setMap(null);
-    userMarker = null;
-  }
-
-  // Handle SOS form submission
-  document.addEventListener('DOMContentLoaded', function() {
-    const sosForm = document.getElementById('sosForm');
-    if (sosForm) {
-      sosForm.addEventListener('submit', function(e) {
-        if (!confirm('Adakah anda pasti ingin menghantar isyarat kecemasan?')) {
-          e.preventDefault();
-        } else if (!userPosition) {
-          alert('Tidak dapat menentukan lokasi anda. Pastikan GPS dihidupkan.');
-          e.preventDefault();
-        }
-      });
-    }
-  });
-</script>
-<script async defer
-  src="https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}&callback=initMap">
-</script>
 @endpush

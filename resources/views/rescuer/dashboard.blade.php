@@ -17,111 +17,153 @@
 </div>
 
 <!-- Quick Action Buttons -->
-{{-- Butang Aksi --}}
 <div class="row g-3 mb-4 justify-content-center">
-  <div class="col-6 col-md-3"><button class="btn btn-primary w-100" onclick="kemaskiniStatus('Terima Tugasan')">✅ Terima Tugasan</button></div>
-  <div class="col-6 col-md-3"><button class="btn btn-success w-100" onclick="kemaskiniStatus('Telah Diselamatkan')">🟢 Telah Diselamatkan</button></div>
-  <div class="col-6 col-md-3"><button class="btn btn-danger w-100" onclick="kemaskiniStatus('Tidak Ditemui')">❌ Tidak Ditemui</button></div>
-  <div class="col-6 col-md-3"><button class="btn btn-warning w-100" onclick="kemaskiniStatus('Tugasan Baru')">🔄 Tugasan Baru</button></div>
+    @php
+        $hasActiveCase = $cases->whereIn('status', ['dalam_tindakan', 'sedang_diselamatkan'])->count() > 0;
+        $hasAssignedCase = $cases->where('status', 'dalam_tindakan')->count() > 0;
+        $hasRescueInProgress = $cases->where('status', 'sedang_diselamatkan')->count() > 0;
+    @endphp
+    
+    @if(!$hasActiveCase)
+        <div class="col-12 col-md-4">
+            <button class="btn btn-primary w-100" onclick="updateCaseStatus('dalam_tindakan')">
+                <i class="fas fa-check-circle me-2"></i>Terima Tugasan
+            </button>
+        </div>
+    @endif
+    
+    @if($hasAssignedCase || $hasRescueInProgress)
+        <div class="col-12 col-md-4">
+            <button class="btn btn-warning w-100" onclick="updateCaseStatus('sedang_diselamatkan')" {{ !$hasAssignedCase ? 'disabled' : '' }}>
+                <i class="fas fa-ambulance me-2"></i>Sedang Menyelamat
+            </button>
+        </div>
+        
+        <div class="col-12 col-md-4">
+            <button class="btn btn-success w-100" onclick="updateCaseStatus('bantuan_selesai')" {{ !$hasRescueInProgress ? 'disabled' : '' }}>
+                <i class="fas fa-check-circle me-2"></i>Selesai Bantu
+            </button>
+        </div>
+    @endif
+    
+    @if($hasActiveCase)
+        <div class="col-12 col-md-4">
+            <button class="btn btn-danger w-100" onclick="updateCaseStatus('tidak_ditemui')">
+                <i class="fas fa-times-circle me-2"></i>Tidak Ditemui
+            </button>
+        </div>
+    @endif
 </div>
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function kemaskiniStatus(status) {
+async function updateCaseStatus(newStatus) {
+    // Find the active case
     const cases = @json($cases);
-    let caseToUpdate = null;
-
-    // This logic assumes a rescuer handles one case at a time.
-    // 'Terima Tugasan' applies to a 'new' case.
-    // Other actions apply to an 'assigned' case.
-    if (status === 'Terima Tugasan') {
-        caseToUpdate = cases.find(c => c.status === 'new');
-    } else if (status === 'Telah Diselamatkan' || status === 'Tidak Ditemui') {
-        caseToUpdate = cases.find(c => c.status === 'assigned');
-    }
-
-    if (status === 'Tugasan Baru') {
+    const activeCase = cases.find(c => ['dalam_tindakan', 'sedang_diselamatkan'].includes(c.status));
+    
+    // If no active case and not accepting a new one, show error
+    if (!activeCase && newStatus !== 'dalam_tindakan') {
         Swal.fire({
-            title: 'Memuatkan Semula',
-            text: 'Mendapatkan senarai tugasan terkini...',
-            icon: 'info',
-            timer: 1500,
-            showConfirmButton: false,
-            willOpen: () => {
-                Swal.showLoading();
-            },
-            willClose: () => {
-                window.location.reload();
-            }
+            title: 'Ralat',
+            text: 'Tiada kes aktif untuk dikemaskini.',
+            icon: 'error',
+            confirmButtonText: 'OK'
         });
         return;
     }
     
-    if (!caseToUpdate) {
-        Swal.fire('Tiada Tugasan', 'Tiada tugasan yang sesuai untuk tindakan ini.', 'info');
+    // Determine which case to update
+    const caseToUpdate = activeCase || cases[0];
+    
+    // Status mapping
+    const statusTexts = {
+        'dalam_tindakan': 'Terima Tugasan',
+        'sedang_diselamatkan': 'Sedang Menyelamat',
+        'bantuan_selesai': 'Selesai Bantu',
+        'tidak_ditemui': 'Tidak Ditemui'
+    };
+    
+    const statusDescriptions = {
+        'dalam_tindakan': 'menerima tugasan untuk membantu mangsa',
+        'sedang_diselamatkan': 'memulakan operasi menyelamat',
+        'bantuan_selesai': 'menandakan bantuan telah selesai',
+        'tidak_ditemui': 'menandakan mangsa tidak ditemui di lokasi'
+    };
+    
+    // Disable all status buttons during update
+    document.querySelectorAll('[onclick^="updateCaseStatus"]').forEach(btn => {
+        btn.disabled = true;
+    });
+    
+    // Show confirmation dialog
+    const result = await Swal.fire({
+        title: 'Sahkan Tindakan',
+        html: `Anda pasti ingin <strong>${statusTexts[newStatus]}</strong>?<br>Ini akan ${statusDescriptions[newStatus]}.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Sahkan',
+        cancelButtonText: 'Batal',
+        reverseButtons: true
+    });
+    
+    if (!result.isConfirmed) {
+        // Re-enable buttons if cancelled
+        document.querySelectorAll('[onclick^="updateCaseStatus"]').forEach(btn => {
+            btn.disabled = false;
+        });
         return;
     }
-
-    let statusText = '';
-    let newStatus = '';
-
-    switch(status) {
-        case 'Terima Tugasan':
-            statusText = 'menerima tugasan';
-            newStatus = 'assigned';
-            break;
-        case 'Telah Diselamatkan':
-            statusText = 'menandakan sebagai "Telah Diselamatkan"';
-            newStatus = 'completed';
-            break;
-        case 'Tidak Ditemui':
-            statusText = 'menandakan sebagai "Tidak Ditemui"';
-            newStatus = 'failed';
-            break;
-        default:
-            Swal.fire('Ralat', 'Tindakan tidak sah.', 'error');
-            return;
-    }
-
-    Swal.fire({
-        title: 'Anda pasti?',
-        text: `Anda akan ${statusText} untuk kes mangsa "${caseToUpdate.victim.name}".`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Ya, teruskan!',
-        cancelButtonText: 'Batal'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // Create and submit a form to follow Laravel's conventions
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = `/rescuer/cases/${caseToUpdate.id}`;
-
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = '_token';
-            csrfInput.value = '{{ csrf_token() }}';
-            form.appendChild(csrfInput);
-
-            const methodInput = document.createElement('input');
-            methodInput.type = 'hidden';
-            methodInput.name = '_method';
-            methodInput.value = 'PUT';
-            form.appendChild(methodInput);
-
-            const statusInput = document.createElement('input');
-            statusInput.type = 'hidden';
-            statusInput.name = 'status';
-            statusInput.value = newStatus;
-            form.appendChild(statusInput);
-
-            document.body.appendChild(form);
-            form.submit();
+    
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const response = await fetch(`/api/rescuer/cases/${caseToUpdate.id}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Ralat semasa mengemas kini status');
         }
-    });
+        
+        // Show success message and reload the page
+        await Swal.fire({
+            title: 'Berjaya!',
+            text: `Status kes berjaya dikemas kini ke "${statusTexts[newStatus]}"`,
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false,
+            willClose: () => {
+                // Reload the page to reflect changes
+                window.location.reload();
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error updating status:', error);
+        
+        // Re-enable buttons on error
+        document.querySelectorAll('[onclick^="updateCaseStatus"]').forEach(btn => {
+            btn.disabled = false;
+        });
+        
+        // Show error message
+        Swal.fire({
+            title: 'Ralat!',
+            text: error.message || 'Gagal mengemas kini status. Sila cuba lagi.',
+            icon: 'error',
+            confirmButtonText: 'OK'
+        });
+    }
 }
 </script>
 @endpush
@@ -189,19 +231,25 @@ function kemaskiniStatus(status) {
                             <td>{{ $case->created_at ?? 'N/A' }}</td>
                             <td>
                                 @if(isset($case->status))
-                                    @if($case->status == 'new')
-                                        <span class="badge bg-warning">Menunggu</span>
-                                    @elseif($case->status == 'assigned')
-                                        <span class="badge bg-info">Dalam Perjalanan</span>
-                                    @elseif($case->status == 'rescued')
-                                        <span class="badge bg-success">Diselamatkan</span>
-                                    @elseif($case->status == 'not_found')
-                                        <span class="badge bg-danger">Tidak Ditemui</span>
-                                    @else
-                                        <span class="badge bg-secondary">{{ $case->status }}</span>
-                                    @endif
+                                    @php
+                                        $statusClasses = [
+                                            'dalam_tindakan' => 'bg-primary',
+                                            'sedang_diselamatkan' => 'bg-warning',
+                                            'bantuan_selesai' => 'bg-success',
+                                            'tidak_ditemui' => 'bg-dark'
+                                        ];
+                                        $statusTexts = [
+                                            'dalam_tindakan' => 'Dalam Tindakan',
+                                            'sedang_diselamatkan' => 'Sedang Diselamatkan',
+                                            'bantuan_selesai' => 'Bantuan Selesai',
+                                            'tidak_ditemui' => 'Tidak Ditemui'
+                                        ];
+                                        $statusClass = $statusClasses[$case->status] ?? 'bg-secondary';
+                                        $statusText = $statusTexts[$case->status] ?? $case->status;
+                                    @endphp
+                                    <span class="badge {{ $statusClass }} status-badge">{{ $statusText }}</span>
                                 @else
-                                    <span class="badge bg-secondary">N/A</span>
+                                    <span class="badge bg-secondary status-badge">N/A</span>
                                 @endif
                             </td>
                             <td>

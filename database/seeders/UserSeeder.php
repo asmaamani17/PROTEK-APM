@@ -13,10 +13,11 @@ class UserSeeder extends Seeder
     public function run(): void
     {
          \App\Models\User::create([
-        'name' => 'Admin PROTEK',
-        'email' => 'admin@protek.com',
+        'name' => 'Admin PROTEK 2',
+        'email' => 'admin6789@protek.com',
         'password' => bcrypt('password'),
         'role' => 'admin',
+        'district' => 'Batu Pahat',
     ]);
 
     \App\Models\User::create([
@@ -31,6 +32,7 @@ class UserSeeder extends Seeder
         'email' => 'rescuer@protek.com',
         'password' => bcrypt('password'),
         'role' => 'rescuer',
+        'district' => 'Batu Pahat',
     ]);
     }
 }

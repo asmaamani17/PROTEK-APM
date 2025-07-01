@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -48,12 +49,25 @@ class User extends Authenticatable
     ];
 
     public function rescueCases() {
-        return $this->hasMany(RescueCase::class, 'victim_id');
+        return $this->hasMany(RescueCase::class, 'rescuer_id');
+    }
+    
+    public function vulnerableGroups() {
+        return $this->hasMany(VulnerableGroup::class);
     }
     
     /**
-     * Get the vulnerable group record associated with the user.
+     * Route notifications for the SMS channel.
+     *
+     * @param  \Illuminate\Notifications\Notification  $notification
+     * @return string
      */
+    public function routeNotificationForSms($notification)
+    {
+        // Return the phone number for SMS notifications
+        return $this->no_telefon;
+    }
+
     public function vulnerableGroup()
     {
         return $this->hasOne(VulnerableGroup::class, 'user_id');

@@ -4,8 +4,56 @@
   <meta charset="UTF-8">
   <title>@yield('title') – Projek Protek</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  @auth
+  <meta name="auth-token" content="{{ auth()->user()->createToken('auth-token')->plainTextToken }}">
+  @endauth
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="{{ asset('css/style.css') }}">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  
+  <!-- Google Maps API -->
+  <script>
+    let googleMapsLoaded = false;
+    let googleMapsPromise = null;
+    
+    function loadGoogleMaps() {
+      if (googleMapsPromise) return googleMapsPromise;
+      
+      googleMapsPromise = new Promise((resolve, reject) => {
+        if (window.google && window.google.maps) {
+          resolve();
+          return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        
+        script.onload = () => {
+          if (window.google && window.google.maps) {
+            googleMapsLoaded = true;
+            resolve();
+          } else {
+            reject(new Error('Google Maps API not loaded properly'));
+          }
+        };
+        
+        script.onerror = () => {
+          reject(new Error('Failed to load Google Maps API'));
+        };
+        
+        document.head.appendChild(script);
+      });
+      
+      return googleMapsPromise;
+    }
+    
+    // Expose the load function globally
+    window.loadGoogleMaps = loadGoogleMaps;
+  </script>
 
   <style>
         body { 
@@ -266,7 +314,7 @@
         }, false);
       });
     });
-  </script>
+    </script>
     
     @stack('scripts')
 </body>

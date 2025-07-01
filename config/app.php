@@ -20,6 +20,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Admin Phone Number
+    |--------------------------------------------------------------------------
+    |
+    | This value is the default admin phone number that will be used for
+    | sending test SMS notifications when no phone number is provided.
+    |
+    */
+
+    'admin_phone' => env('ADMIN_PHONE', '60123456789'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
@@ -165,7 +177,7 @@ return [
          */
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
-        // App\Providers\BroadcastServiceProvider::class,
+        App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
     ])->toArray(),
